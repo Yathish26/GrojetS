@@ -48,6 +48,19 @@ const InventorySchema = new mongoose.Schema({
 
 const Inventory = mongoose.model('Inventory', InventorySchema);
 
+// --- Merchant Model Definition ---
+const MerchantSchema = new mongoose.Schema({
+  businessName: { type: String, required: true, trim: true },
+  contactPerson: { type: String, required: true, trim: true },
+  email: { type: String, required: true, unique: true },
+  phone: { type: String, required: true, trim: true },
+  businessType: { type: String, required: true, trim: true },
+  address: { type: String, required: true, trim: true },
+  message: { type: String, trim: true },
+  registrationDate: { type: Date, default: Date.now }
+});
+
+const Merchant = mongoose.model('Merchant', MerchantSchema);
 
 // --- Database Connection ---
 const MONGODB_URI = process.env.MONGODB_URI;
@@ -191,7 +204,11 @@ app.get('/inventory/count', protect, async (req, res) => {
 // Get All Inventory Items
 app.get('/inventory/all', protect, async (req, res) => {
   try {
-    const inventory = await Inventory.find().sort({ createdAt: -1 });
+    const inventory = await Inventory.find({}, 'itemName category stockquantity price createdAt')
+      .sort({ createdAt: -1 })
+      .limit(100) // Only sends first 100
+      .lean();
+
     res.status(200).json({ success: true, inventory });
   } catch (err) {
     console.error('Get all inventory error:', err);
@@ -199,11 +216,43 @@ app.get('/inventory/all', protect, async (req, res) => {
   }
 });
 
-// Admin Login
-app.post('/api/auth/admin/login', async (req, res) => {
+
+// Delete Inventory Item
+app.delete('/inventory/delete/:id', protect, async (req, res) => {
   try {
-    const { login, password } = req.body;
-    if (login !== 'admin' || password !== 'admin123') {
+    const { id } = req.params;
+
+    const deletedItem = await Inventory.findByIdAndDelete(id);
+    if (!deletedItem) {
+      return res.status(404).json({ success: false, message: 'Inventory item not found' });
+    }
+
+    res.status(200).json({ success: true, message: 'Inventory item deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting inventory item:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
+
+// Edit Inventory Item
+app.put('/inventory/edit/:id', protect, async (req, res) => {
+  try {
+    const inventory = await Inventory.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    if (!inventory) return res.status(404).json({ msg: 'Inventory item not found' });
+
+    res.status(200).json({ success: true, inventory });
+  } catch (err) {
+    console.error('Edit inventory error:', err);
+    res.status(500).json({ msg: 'Server error' });
+  }
+});
+
+// Admin Login
+app.post('/admin/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (email !== 'admin@grojet.com' || password !== '123456') {
       return res.status(400).json({ msg: 'Invalid credentials' });
     }
 
@@ -219,6 +268,84 @@ app.post('/api/auth/admin/login', async (req, res) => {
   } catch (err) {
     console.error('Admin login error:', err);
     res.status(500).json({ msg: 'Server error' });
+  }
+});
+
+// Delivery Agent Login
+app.post('/delivery/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (email !== 'delivery@grojet.com' || password !== '123456') {
+      return res.status(400).json({ msg: 'Invalid credentials' });
+    }
+
+    const token = jwt.sign({ agent: true }, process.env.JWT_SECRET, {
+      expiresIn: '7d'
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Logged in successfully',
+      token
+    });
+  } catch (err) {
+    console.error('Agent login error:', err);
+    res.status(500).json({ msg: 'Server error' });
+  }
+});
+
+
+//Register Merchants
+app.post('/merchants', async (req, res) => {
+  try {
+    const {
+      businessName,
+      contactPerson,
+      email,
+      phone,
+      businessType,
+      address,
+      message,
+    } = req.body;
+
+    if (!businessName || !contactPerson || !email || !phone || !businessType || !address) {
+      return res.status(400).json({ error: 'Please fill all required fields.' });
+    }
+
+    const newMerchant = new Merchant({
+      businessName,
+      contactPerson,
+      email,
+      phone,
+      businessType,
+      address,
+      message,
+    });
+
+    const savedMerchant = await newMerchant.save();
+    res.status(201).json({ success: true, merchant: savedMerchant });
+  } catch (err) {
+    console.error('Merchant creation error:', err);
+
+    if (err.code === 11000) {
+      return res.status(400).json({ error: 'A merchant with this email already exists.' });
+    }
+
+    res.status(500).json({ error: 'Server error. Please try again later.' });
+  }
+});
+
+// Get all Merchant Enquiries
+app.get('/merchants/enquiries',protect, async (req, res) => {
+  try {
+    const merchants = await Merchant.find({}, 'businessName contactPerson email phone businessType address message createdAt')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    res.status(200).json({ success: true, merchants });
+  } catch (err) {
+    console.error('Get merchant enquiries error:', err);
+    res.status(500).json({ error: 'Server error. Please try again later.' });
   }
 });
 
