@@ -10,10 +10,9 @@ const productSchema = new mongoose.Schema({
   images: [{ type: String }],
   thumbnail: { type: String },
 
-  brand: { type: mongoose.Schema.Types.ObjectId, ref: 'Brand' },
-  categories: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Category' }], // multi-tag style
-  mainCategory: { type: mongoose.Schema.Types.ObjectId, ref: 'Category' }, // inferred parent header
-
+  brand: { type: String },
+  category: { type: mongoose.Schema.Types.ObjectId, ref: 'Category' },
+  category_string: { type: String },
   sku: { type: String, unique: true },
   barcode: { type: String },
   variants: [
@@ -24,7 +23,6 @@ const productSchema = new mongoose.Schema({
       stock: Number,
       unit: String,
       image: String,
-      sellerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Seller' },
     }
   ],
 
@@ -69,15 +67,17 @@ productSchema.pre('save', async function (next) {
       .replace(/-+/g, '-');
   }
 
-  if (this.categories?.length && !this.mainCategory) {
-    const cat = await mongoose.model('Category').findById(this.categories[0]);
+  if (this.isModified('category') && this.category) {
+    const Category = mongoose.model('Category');
+    const cat = await Category.findById(this.category).select('name');
     if (cat) {
-      this.mainCategory = cat.parentId || cat._id;
+      this.category_string = cat.name;
     }
   }
 
   next();
 });
+
 
 const Product = mongoose.model('Product', productSchema);
 export default Product;

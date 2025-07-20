@@ -10,6 +10,7 @@ import merchantRoutes from './routes/merchantRoutes.js';
 import merchantAdmin from './routes/admin/merchantAdmin.js';
 import authAdmin from './routes/admin/authAdmin.js';
 import authDelivery from './routes/delivery/authDelivery.js';
+import userAdmin from './routes/admin/userAdmin.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -40,6 +41,7 @@ app.use('/admin/auth', authAdmin);
 app.use('/admin/categories', categoryAdmin);
 app.use('/admin/products', productAdmin);
 app.use('/admin/merchants', merchantAdmin);
+app.use('/admin/users', userAdmin);
 
 // Delivery Routes
 app.use('/delivery/auth', authDelivery);

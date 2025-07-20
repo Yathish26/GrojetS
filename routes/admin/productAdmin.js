@@ -34,8 +34,7 @@ router.get('/count', protect, async (req, res) => {
 router.get('/', async (req, res) => {
     try {
         const products = await Product.find({})
-            .populate('categoryId', 'name slug')
-            .populate('mainCategoryId', 'name slug')
+            .populate('category', 'name slug')
             .sort({ createdAt: -1 })
             .limit(100)
             .lean();
@@ -51,8 +50,8 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
     try {
         const product = await Product.findById(req.params.id)
-            .populate('categoryId', 'name slug')
-            .populate('mainCategoryId', 'name slug');
+            .populate('category', 'name slug')
+            .populate('mainCategory', 'name slug');
         if (!product) {
             return res.status(404).json({ message: 'Product not found' });
         }
