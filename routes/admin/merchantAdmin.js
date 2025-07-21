@@ -7,8 +7,8 @@ const router = express.Router();
 // Gets all merchant enquiries with pagination
 router.get('/enquiries', protect, async (req, res) => {
     try {
-        const page = parseInt(req.query.page) || 1; // Default to page 1
-        const limit = parseInt(req.query.limit) || 10; // Default to 10 per page
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
         const skip = (page - 1) * limit;
 
         const total = await Merchant.countDocuments();

@@ -35,5 +35,15 @@ categorySchema.pre('save', function (next) {
     next();
 });
 
+categorySchema.post('findOneAndUpdate', async function (doc) {
+    if (doc) {
+        const Product = mongoose.model('Product');
+        await Product.updateMany(
+            { category: doc._id },
+            { $set: { category_string: doc.name } }
+        );
+    }
+});
+
 const Category = mongoose.model('Category', categorySchema);
 export default Category;

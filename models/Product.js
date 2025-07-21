@@ -78,6 +78,18 @@ productSchema.pre('save', async function (next) {
   next();
 });
 
+productSchema.post('findOneAndUpdate', async function (doc) {
+  if (doc && doc.category) {
+    const Category = mongoose.model('Category');
+    const cat = await Category.findById(doc.category).select('name');
+    if (cat) {
+      await mongoose.model('Product').updateOne(
+        { _id: doc._id },
+        { $set: { category_string: cat.name } }
+      );
+    }
+  }
+});
 
 const Product = mongoose.model('Product', productSchema);
 export default Product;
