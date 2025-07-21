@@ -5,6 +5,20 @@ const router = express.Router();
 
 // Registers a new merchant
 router.post('/', async (req, res) => {
+    const requiredFields = [
+        'businessName',
+        'contactPerson',
+        'email',
+        'phone',
+        'businessType',
+        'address'
+    ];
+
+    const missingFields = requiredFields.filter(field => !req.body[field]);
+    if (missingFields.length) {
+        return res.status(400).json({ error: `Missing fields: ${missingFields.join(', ')}` });
+    }
+
     try {
         const {
             businessName,
@@ -13,11 +27,12 @@ router.post('/', async (req, res) => {
             phone,
             businessType,
             address,
-            message,
+            message = ''
         } = req.body;
 
-        if (!businessName || !contactPerson || !email || !phone || !businessType || !address) {
-            return res.status(400).json({ error: 'Please fill all required fields.' });
+        const existingMerchant = await Merchant.findOne({ email });
+        if (existingMerchant) {
+            return res.status(400).json({ error: 'A merchant with this email already exists.', dupMerchant: true });
         }
 
         const newMerchant = new Merchant({
@@ -27,17 +42,12 @@ router.post('/', async (req, res) => {
             phone,
             businessType,
             address,
-            message,
+            message
         });
 
         const savedMerchant = await newMerchant.save();
         res.status(201).json({ success: true, merchant: savedMerchant });
     } catch (err) {
-
-        if (err.code === 11000) {
-            return res.status(400).json({ error: 'A merchant with this email already exists.', dupMerchant: true });
-        }
-
         res.status(500).json({ error: 'Server error. Please try again later.' });
     }
 });
