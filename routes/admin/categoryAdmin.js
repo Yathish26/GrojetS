@@ -20,7 +20,7 @@ router.post('/', protect, async (req, res) => {
 });
 
 // Gets all categories
-router.get('/', async (req, res) => {
+router.get('/', protect, async (req, res) => {
     try {
         const categories = await Category.find({}).sort({ name: 1 });
         res.status(200).json({ success: true, categories });
@@ -31,7 +31,7 @@ router.get('/', async (req, res) => {
 });
 
 // Gets a category by ID
-router.get('/:id', async (req, res) => {
+router.get('/:id', protect, async (req, res) => {
     try {
         const category = await Category.findById(req.params.id);
         if (!category) {

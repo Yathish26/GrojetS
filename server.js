@@ -11,6 +11,7 @@ import merchantAdmin from './routes/admin/merchantAdmin.js';
 import authAdmin from './routes/admin/authAdmin.js';
 import authDelivery from './routes/delivery/authDelivery.js';
 import userAdmin from './routes/admin/userAdmin.js';
+import networkHealth from './routes/tools/networkhealth.js'
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -41,6 +42,8 @@ app.get('/', (req, res) => {
 });
 
 
+//Network Health Check Route
+app.use('/tools/network/health', networkHealth);
 
 // Admin Routes
 app.use('/admin/auth', authAdmin);
