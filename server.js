@@ -20,7 +20,10 @@ connectDB();
 
 // Middleware
 app.use(cors({
-  origin: 'https://grojetdelivery.com',
+  origin: [
+    'https://grojetdelivery.com',
+    'http://localhost:5173',
+  ],
   credentials: true
 }));
 app.use(bodyParser.json());
@@ -56,6 +59,6 @@ app.use('/merchants', merchantRoutes);
 
 // Start the Express server
 app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-    console.log(`Access: http://localhost:${PORT}`);
+  console.log(`Server running on port ${PORT}`);
+  console.log(`Access: http://localhost:${PORT}`);
 });

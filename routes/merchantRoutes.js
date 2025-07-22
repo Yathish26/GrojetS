@@ -25,6 +25,7 @@ router.post('/', async (req, res) => {
             contactPerson,
             email,
             phone,
+            alternatePhone = '',
             businessType,
             address,
             message = ''
@@ -40,6 +41,7 @@ router.post('/', async (req, res) => {
             contactPerson,
             email,
             phone,
+            alternatePhone,
             businessType,
             address,
             message
