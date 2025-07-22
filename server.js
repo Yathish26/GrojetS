@@ -19,7 +19,10 @@ const PORT = process.env.PORT || 5000;
 connectDB();
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: 'https://grojetdelivery.com',
+  credentials: true
+}));
 app.use(bodyParser.json());
 
 // Basic Route
