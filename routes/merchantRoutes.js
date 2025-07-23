@@ -11,7 +11,7 @@ router.post('/', async (req, res) => {
         'email',
         'phone',
         'businessType',
-        'address'
+        'region'
     ];
 
     const missingFields = requiredFields.filter(field => !req.body[field]);
@@ -27,13 +27,18 @@ router.post('/', async (req, res) => {
             phone,
             alternatePhone = '',
             businessType,
-            address,
+            region,
             message = ''
         } = req.body;
 
         const existingMerchant = await Merchant.findOne({ email });
+        const existingMobile = await Merchant.findOne({ phone });
+        
         if (existingMerchant) {
             return res.status(400).json({ error: 'A merchant with this email already exists.', dupMerchant: true });
+        }
+        if (existingMobile) {
+            return res.status(400).json({ error: 'A merchant with this phone number already exists.', dupPhone: true });
         }
 
         const newMerchant = new Merchant({
@@ -43,7 +48,7 @@ router.post('/', async (req, res) => {
             phone,
             alternatePhone,
             businessType,
-            address,
+            region,
             message
         });
 

@@ -7,7 +7,7 @@ const MerchantSchema = new mongoose.Schema({
     phone: { type: String, required: true, trim: true, maxlength: 15 },
     alternatePhone: { type: String, trim: true, maxlength: 15 },
     businessType: { type: String, required: true, trim: true, maxlength: 20 },
-    address: { type: String, required: true, trim: true, maxlength: 20 },
+    region: { type: String, required: true, trim: true, maxlength: 20 },
     message: { type: String, trim: true, maxlength: 200 },
     registrationDate: { type: Date, default: Date.now }
 });

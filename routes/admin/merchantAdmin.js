@@ -12,7 +12,7 @@ router.get('/enquiries', protect, async (req, res) => {
         const skip = (page - 1) * limit;
 
         const total = await Merchant.countDocuments();
-        const merchants = await Merchant.find({}, 'businessName contactPerson email phone businessType address message createdAt')
+        const merchants = await Merchant.find({}, 'businessName contactPerson email phone businessType region alternatePhone message createdAt')
             .sort({ createdAt: -1 })
             .skip(skip)
             .limit(limit)
