@@ -2,13 +2,12 @@ import jwt from 'jsonwebtoken';
 
 const protect = (req, res, next) => {
     try {
-        const authHeader = req.headers.authorization;
+        const token = req.cookies && req.cookies.admin_token;
 
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
-            return res.status(401).json({ message: 'Authorization token missing or malformed', tokenValid: false });
+        if (!token) {
+            return res.status(401).json({ message: 'Authorization token missing', tokenValid: false });
         }
 
-        const token = authHeader.split(' ')[1];
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
         req.user = decoded;

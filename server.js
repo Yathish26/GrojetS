@@ -12,6 +12,7 @@ import authAdmin from './routes/admin/authAdmin.js';
 import authDelivery from './routes/delivery/authDelivery.js';
 import userAdmin from './routes/admin/userAdmin.js';
 import networkHealth from './routes/tools/networkhealth.js'
+import cookieParser from 'cookie-parser';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -28,6 +29,7 @@ app.use(cors({
   credentials: true
 }));
 app.use(bodyParser.json());
+app.use(cookieParser());
 
 // Basic Route
 app.get('/', (req, res) => {
