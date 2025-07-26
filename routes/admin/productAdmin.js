@@ -30,16 +30,46 @@ router.get('/count', protect, async (req, res) => {
     }
 });
 
-// Gets all products with category details
+// Gets paginated products with category, status, and search filtering
 router.get('/', async (req, res) => {
     try {
-        const products = await Product.find({})
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 100;
+        const search = req.query.search || '';
+        const category = req.query.category || '';
+        const status = req.query.status || '';
+
+        const query = {};
+        if (search) {
+            query.$or = [
+                { name: { $regex: search, $options: 'i' } },
+                { slug: { $regex: search, $options: 'i' } },
+                { sku: { $regex: search, $options: 'i' } }
+            ];
+        }
+        if (category) {
+            query.category = category;
+        }
+        if (status) {
+            query.status = status;
+        }
+
+        const products = await Product.find(query)
             .populate('category', 'name slug')
             .sort({ createdAt: -1 })
-            .limit(100)
+            .skip((page - 1) * limit)
+            .limit(limit)
             .lean();
 
-        res.status(200).json({ success: true, products });
+        const total = await Product.countDocuments(query);
+
+        res.status(200).json({
+            success: true,
+            products,
+            page,
+            totalPages: Math.ceil(total / limit),
+            total
+        });
     } catch (err) {
         console.error('Get all products error:', err);
         res.status(500).json({ message: 'Server error' });
