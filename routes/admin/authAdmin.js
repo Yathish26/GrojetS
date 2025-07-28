@@ -3,7 +3,8 @@ import jwt from 'jsonwebtoken';
 
 const router = express.Router();
 
-// Logs in an admin user
+const isProduction = process.env.NODE_ENV === 'production';
+
 router.post('/login', async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -15,14 +16,19 @@ router.post('/login', async (req, res) => {
             expiresIn: '1d'
         });
 
+        const cookieOptions = {
+            httpOnly: true,
+            secure: isProduction, // HTTPS only in production
+            maxAge: 24 * 60 * 60 * 1000, // 1 day
+            sameSite: isProduction ? 'none' : 'lax',
+        };
+
+        if (isProduction) {
+            cookieOptions.domain = '.grojetdelivery.com';
+        }
+
         res
-            .cookie('admin_token', token, {
-                httpOnly: true,
-                secure: process.env.NODE_ENV === 'production', // only send over HTTPS in production
-                maxAge: 24 * 60 * 60 * 1000, // 1 day
-                sameSite: 'none',
-                domain: '.grojetdelivery.com'
-            })
+            .cookie('admin_token', token, cookieOptions)
             .status(200)
             .json({
                 success: true,
@@ -35,13 +41,17 @@ router.post('/login', async (req, res) => {
 });
 
 router.post('/logout', (req, res) => {
+    const cookieOptions = {
+        httpOnly: true,
+        secure: isProduction,
+        sameSite: isProduction ? 'none' : 'lax',
+    };
+    if (isProduction) {
+        cookieOptions.domain = '.grojetdelivery.com';
+    }
+
     res
-        .clearCookie('admin_token', {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'none',
-            domain: '.grojetdelivery.com'
-        })
+        .clearCookie('admin_token', cookieOptions)
         .status(200)
         .json({
             success: true,

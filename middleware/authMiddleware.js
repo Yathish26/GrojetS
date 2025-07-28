@@ -19,4 +19,29 @@ const protect = (req, res, next) => {
     }
 };
 
-export { protect };
+// React Native: Checks for token in Authorization header
+const protectNative = (req, res, next) => {
+    try {
+        let token;
+        const authHeader = req.headers.authorization;
+
+        if (authHeader && authHeader.startsWith('Bearer ')) {
+            token = authHeader.split(' ')[1];
+        }
+
+        if (!token) {
+            return res.status(401).json({ message: 'Authorization token missing', tokenValid: false });
+        }
+
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+        req.user = decoded;
+        res.locals.tokenValid = true;
+        next();
+    } catch (error) {
+        console.error('JWT Verification Error:', error.message);
+        return res.status(401).json({ message: 'Unauthorized: Invalid or expired token', tokenValid: false });
+    }
+};
+
+export { protect, protectNative };

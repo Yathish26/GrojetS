@@ -13,6 +13,8 @@ import authDelivery from './routes/delivery/authDelivery.js';
 import userAdmin from './routes/admin/userAdmin.js';
 import networkHealth from './routes/tools/networkhealth.js'
 import cookieParser from 'cookie-parser';
+import homepageRoutes from './routes/homepageRoutes.js';
+import categoryRoutes from './routes/categoryRoutes.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -24,7 +26,9 @@ connectDB();
 app.use(cors({
   origin: [
     'https://grojetdelivery.com',
+    'https://admin.grojetdelivery.com',
     'http://localhost:5173',
+    'http://localhost:5174',
   ],
   credentials: true
 }));
@@ -61,6 +65,8 @@ app.use('/delivery/auth', authDelivery);
 app.use('/auth', authRoutes);
 app.use('/products', productAdmin);
 app.use('/merchants', merchantRoutes);
+app.use('/home',homepageRoutes);
+app.use('/categories',categoryRoutes);
 
 // Start the Express server
 app.listen(PORT, () => {
