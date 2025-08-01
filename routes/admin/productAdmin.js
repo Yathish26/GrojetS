@@ -109,6 +109,38 @@ router.put('/:id', protect, async (req, res) => {
     }
 });
 
+// Update product status (availability)
+router.put('/:id/status', protect, async (req, res) => {
+    try {
+        const { isAvailable } = req.body;
+        
+        const product = await Product.findByIdAndUpdate(
+            req.params.id,
+            { isAvailable },
+            { new: true }
+        );
+
+        if (!product) {
+            return res.status(404).json({ 
+                success: false,
+                message: 'Product not found' 
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            message: `Product ${isAvailable ? 'enabled' : 'disabled'} successfully`,
+            product
+        });
+    } catch (error) {
+        console.error('Error updating product status:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Internal server error' 
+        });
+    }
+});
+
 // Deletes a product by ID
 router.delete('/:id', protect, async (req, res) => {
     try {

@@ -1,74 +1,65 @@
 import express from 'express';
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 import { protectNative } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-// Registers a new user
-router.post('/register', async (req, res) => {
-    const { name, email, password } = req.body;
-    try {
-        let user = await User.findOne({ email });
-        if (user) {
-            return res.status(400).json({ message: 'User already exists' });
-        }
-        user = new User({ name, email, password });
-        await user.save();
-        res.status(201).json({
-            success: true,
-            message: 'User registered successfully',
-            user: { id: user._id, name: user.name, email: user.email }
-        });
-    } catch (err) {
-        console.error(err.message);
-        res.status(500).send('Server error');
-    }
-});
-
-// Logs in a user and returns a JWT token
-router.post('/login', async (req, res) => {
-    try {
-        const { email, password } = req.body;
-
-        const user = await User.findOne({ email }).select('+password');
-        if (!user) return res.status(400).json({ msg: 'Invalid credentials' });
-
-        const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) return res.status(400).json({ msg: 'Invalid credentials' });
-
-        const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
-            expiresIn: '7d'
-        });
-
-        res.status(200).json({
-            success: true,
-            message: 'Logged in successfully',
-            token,
-            user: {
-                id: user._id,
-                name: user.name,
-                email: user.email
-            }
-        });
-    } catch (err) {
-        console.error('Login error:', err);
-        res.status(500).json({ msg: 'Server error' });
-    }
-});
-
-// Gets the authenticated user's profile
+const otpStorage = new Map();
 router.get('/me', protectNative, async (req, res) => {
     try {
-        const user = await User.findById(req.user.userId).select('name email createdAt');
-        if (!user) return res.status(404).json({ msg: 'User not found' });
-
-        res.status(200).json({ success: true, user });
+        const user = await User.findById(req.user.userId).select('name phoneNumber isPhoneVerified createdAt');
+        if (!user) {
+            return res.status(404).json({ 
+                success: false,
+                message: 'User not found' 
+            });
+        }
+        res.status(200).json({ 
+            success: true, 
+            user 
+        });
     } catch (err) {
         console.error('Fetch user error:', err);
-        res.status(500).json({ msg: 'Server error' });
+        res.status(500).json({ 
+            success: false,
+            message: 'Server error' 
+        });
     }
 });
+
+router.post('/webhooks/grojetotp', async (req, res) => {
+    try {
+        const webhookData = req.body;
+        console.log('Received GrojetOTP Webhook Event:', webhookData);
+        if (webhookData.event_type === 'otp_sent') {
+            console.log(`OTP sent to ${webhookData.phoneNumber} with status: ${webhookData.status}`);
+        } else if (webhookData.event_type === 'otp_verified') {
+            console.log(`OTP verified for ${webhookData.phoneNumber}.`);
+            let user = await User.findOne({ phoneNumber: webhookData.phoneNumber });
+            if (user && !user.isPhoneVerified) {
+                user.isPhoneVerified = true;
+                await user.save();
+                console.log(`User ${user.name} (${user.phoneNumber}) marked as phone verified.`);
+            }
+        } else if (webhookData.event_type === 'otp_failed') {
+            console.log(`OTP failed for ${webhookData.phoneNumber}. Reason: ${webhookData.reason}`);
+        } else {
+            console.log('Unhandled GrojetOTP webhook event type:', webhookData.event_type);
+        }
+        res.status(200).send('Webhook received successfully');
+    } catch (err) {
+        console.error('GrojetOTP Webhook error:', err);
+        res.status(500).send('Internal Server Error'); 
+    }
+});
+
+setInterval(() => {
+    const now = Date.now();
+    for (const [phone, data] of otpStorage.entries()) {
+        if (now > data.expiryTime) {
+            otpStorage.delete(phone);
+        }
+    }
+}, 60000);
 
 export default router;
