@@ -9,8 +9,8 @@ const router = express.Router();
 const isProduction = process.env.NODE_ENV === 'production';
 
 // Hardcoded PIN for admin registration authorization
-const ADMIN_REGISTRATION_PIN = '123456';
-const AUTHORIZED_EMAIL = 'yathishkumar2013@gmail.com';
+const ADMIN_REGISTRATION_PIN = process.env.ADMIN_REGISTRATION_PIN
+const AUTHORIZED_EMAIL = process.env.AUTHORIZED_EMAIL
 
 // Store OTPs temporarily (in production, use Redis or database)
 const otpStore = new Map();
