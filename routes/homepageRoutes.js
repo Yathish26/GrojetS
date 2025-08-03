@@ -4,10 +4,7 @@ import Category from '../models/Category.js';
 
 const router = express.Router();
 
-/**
- * 1. Featured / Popular Items
- * GET /featured
- */
+// Featured Products
 router.get('/featured', async (req, res) => {
   try {
     const limit = Number(req.query.limit) || 8;
@@ -21,10 +18,23 @@ router.get('/featured', async (req, res) => {
   }
 });
 
-/**
- * 2. New Arrivals
- * GET /new?limit=10
- */
+// Hot Deals
+router.get('/hotdeals', async (req, res) => {
+  try {
+    const minDiscount = Number(req.query.minDiscount) || 5;
+    const limit = 10;
+    const hotDeals = await Product.find({ 'pricing.discountPercent': { $gte: minDiscount } })
+      .select('name slug thumbnail pricing.mrp pricing.sellingPrice pricing.discountPercent pricing.offerTag stock.status category_string brand')
+      .sort({ 'pricing.discountPercent': -1 })
+      .limit(limit)
+      .exec();
+    res.json(hotDeals);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch hot deals' });
+  }
+});
+
+// New Arrivals
 router.get('/new', async (req, res) => {
   try {
     const limit = Number(req.query.limit) || 10;
@@ -39,16 +49,15 @@ router.get('/new', async (req, res) => {
   }
 });
 
-/**
- * 3. Deals / Offers / Discounts
- * GET /offers?minDiscount=10
- */
+// Offers and Deals
 router.get('/offers', async (req, res) => {
   try {
     const minDiscount = Number(req.query.minDiscount) || 1;
+    const limit = 10;
     const offerProducts = await Product.find({ 'pricing.discountPercent': { $gte: minDiscount } })
       .select('name slug thumbnail pricing.mrp pricing.sellingPrice pricing.discountPercent pricing.offerTag stock.status category_string brand')
       .sort({ 'pricing.discountPercent': -1 })
+      .limit(limit)
       .exec();
     res.json(offerProducts);
   } catch (err) {
@@ -56,10 +65,7 @@ router.get('/offers', async (req, res) => {
   }
 });
 
-/**
- * 4. Shop by Category (Quick Picks)
- * GET /categories/quick-picks?limit=6&productsPerCategory=3
- */
+// Category and Quick Picks
 router.get('/categories/quick-picks', async (req, res) => {
   try {
     const categoryLimit = Number(req.query.limit) || 6;
@@ -89,10 +95,34 @@ router.get('/categories/quick-picks', async (req, res) => {
   }
 });
 
-/**
- * 5. Most Viewed / Trending Products
- * GET /trending?limit=6
- */
+// Category List Only and from and to
+// /categories/list?from=5&to=8
+router.get('/categories/list', async (req, res) => {
+  try {
+    const categoryLimit = Number(req.query.limit) || 20;
+    const from = Number(req.query.from) || 0;
+    const to = req.query.to !== undefined ? Number(req.query.to) : from + categoryLimit;
+
+    // Ensure indices are valid and from <= to
+    const start = Math.max(0, from);
+    const end = Math.max(start, to);
+
+    // Use skip and limit for efficient pagination
+    const totalToGet = end - start;
+
+    const categories = await Category.find({})
+      .select('_id name image')
+      .skip(start)
+      .limit(totalToGet)
+      .exec();
+
+    res.json(categories);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch category list' });
+  }
+});
+
+// Trending Products
 router.get('/trending', async (req, res) => {
   try {
     const limit = Number(req.query.limit) || 6;
