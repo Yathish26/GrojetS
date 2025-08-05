@@ -21,6 +21,7 @@ import categoryRoutes from './routes/categoryRoutes.js';
 import imageRoutes from './routes/tools/imageRoutes.js';
 import adminManagement from './routes/admin/adminManagement.js';
 import inventoryRoutes from './routes/inventoryRoutes.js';
+import productRoutes from './routes/productRoutes.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -38,6 +39,7 @@ app.use(cors({
     'http://localhost:3000',
     'http://192.168.1.38:5000', // Add your local IP if needed
     'exp://192.168.1.35:8081', // Expo development server
+    'http://192.168.7.10:5000',
     true // Allow all origins for React Native development
   ],
   credentials: true,
@@ -85,7 +87,7 @@ app.use('/inventory', inventoryRoutes);
 
 // Public Routes
 app.use('/auth', authRoutes);
-app.use('/products', productAdmin);
+app.use('/products', productRoutes);
 app.use('/merchants', merchantRoutes);
 app.use('/home', homepageRoutes);
 app.use('/categories', categoryRoutes);
