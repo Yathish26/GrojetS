@@ -22,6 +22,7 @@ import imageRoutes from './routes/tools/imageRoutes.js';
 import adminManagement from './routes/admin/adminManagement.js';
 import inventoryRoutes from './routes/inventoryRoutes.js';
 import productRoutes from './routes/productRoutes.js';
+import migrationRoutes from './routes/admin/migrationRoutes.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -69,7 +70,7 @@ app.use('/image', imageRoutes)
 
 // Admin Routes
 app.use('/admin/auth', authAdmin);
-app.use('/admin/dashboard', adminManagement); // Add dashboard route
+app.use('/admin/dashboard', adminManagement);
 app.use('/admin/categories', categoryAdmin);
 app.use('/admin/products', productAdmin);
 app.use('/admin/merchants', merchantAdmin);
@@ -78,6 +79,7 @@ app.use('/admin/delivery-agents', deliveryAgentAdmin);
 app.use('/admin/orders', orderAdmin);
 app.use('/admin/delivery-zones', deliveryZoneAdmin);
 app.use('/admin/admin-management', adminManagement);
+app.use('/admin/migrations', migrationRoutes);
 
 // Delivery Routes
 app.use('/delivery/auth', authDelivery);

@@ -3,8 +3,8 @@ import bcrypt from 'bcryptjs';
 
 const UserSchema = new mongoose.Schema({
     personalInfo: {
-        name: { type: String, required: true, trim: true },
-        email: { type: String, required: true, unique: true },
+        name: { type: String, trim: true },
+        email: { type: String, trim: true, lowercase: true, unique: true, sparse: true },
         phone: { type: String, required: true, unique: true },
         dateOfBirth: { type: Date },
         gender: { type: String, enum: ['male', 'female', 'other'] },
@@ -96,7 +96,9 @@ UserSchema.pre('save', async function (next) {
 // Generate referral code
 UserSchema.pre('save', function(next) {
     if (!this.loyalty.referralCode) {
-        this.loyalty.referralCode = `GRO${this.personalInfo.name.substring(0, 3).toUpperCase()}${Date.now().toString().slice(-4)}`;
+        const base = (this.personalInfo?.name || 'USR').toString();
+        const prefix = base.substring(0, 3).toUpperCase();
+        this.loyalty.referralCode = `GRO${prefix}${Date.now().toString().slice(-4)}`;
     }
     next();
 });
