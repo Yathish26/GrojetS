@@ -70,7 +70,6 @@ app.use('/image', imageRoutes)
 
 // Admin Routes
 app.use('/admin/auth', authAdmin);
-app.use('/admin/dashboard', adminManagement);
 app.use('/admin/categories', categoryAdmin);
 app.use('/admin/products', productAdmin);
 app.use('/admin/merchants', merchantAdmin);

@@ -166,7 +166,6 @@ router.post('/login', async (req, res) => {
             { 
                 adminId: admin._id,
                 role: admin.role,
-                permissions: admin.permissions
             }, 
             process.env.JWT_SECRET, 
             { expiresIn: '8h' }
@@ -193,13 +192,13 @@ router.post('/login', async (req, res) => {
                     name: admin.name,
                     email: admin.email,
                     role: admin.role,
-                    permissions: admin.permissions,
                     lastLogin: admin.lastLogin,
+                    createdAt: admin.createdAt,
                     department: admin.department,
                     passwordLastChanged: admin.passwordLastChanged,
                     twofactorAuth: admin.twofactorAuth,
                     phone: admin.phone,
-                    address: admin.address
+                    department: admin.department
                 }
             });
     } catch (err) {
@@ -280,7 +279,7 @@ router.post('/create', async (req, res) => {
             });
         }
 
-        const { name, email, password, role, permissions, phone, address } = req.body;
+        const { name, email, password, role, phone, department } = req.body;
 
         // Validate required fields
         if (!name || !email || !password) {
@@ -300,9 +299,8 @@ router.post('/create', async (req, res) => {
             email,
             password,
             role: role || 'admin',
-            permissions: permissions || [],
             phone,
-            address
+            department
         });
 
         await newAdmin.save();
@@ -315,7 +313,6 @@ router.post('/create', async (req, res) => {
                 name: newAdmin.name,
                 email: newAdmin.email,
                 role: newAdmin.role,
-                permissions: newAdmin.permissions
             }
         });
     } catch (error) {
@@ -383,69 +380,6 @@ router.put('/status/:adminId', protectWithRole(['super_admin']), async (req, res
         });
     } catch (error) {
         console.error('Update admin status error:', error);
-        res.status(500).json({ success: false, message: 'Server error' });
-    }
-});
-
-// Fallback login for initial setup (remove in production)
-router.post('/login-fallback', async (req, res) => {
-    try {
-        const { email, password } = req.body;
-        
-        // Only allow specific super admin login
-        if (email !== 'superadmin@grojet.com' || password !== 'SuperAdmin@123') {
-            return res.status(400).json({ success: false, message: 'Invalid credentials' });
-        }
-
-        // Check if super admin exists, create if not
-        let admin = await Admin.findOne({ email });
-        if (!admin) {
-            admin = new Admin({
-                name: 'Super Admin',
-                email: 'superadmin@grojet.com',
-                password: 'SuperAdmin@123',
-                role: 'super_admin',
-                permissions: [] // Super admin has all permissions
-            });
-            await admin.save();
-        }
-
-        const token = jwt.sign(
-            { 
-                adminId: admin._id,
-                role: admin.role,
-                permissions: admin.permissions
-            }, 
-            process.env.JWT_SECRET, 
-            { expiresIn: '8h' }
-        );
-
-        const cookieOptions = {
-            httpOnly: true,
-            secure: isProduction,
-            maxAge: 8 * 60 * 60 * 1000,
-            sameSite: isProduction ? 'none' : 'lax',
-        };
-
-        if (isProduction) {
-            cookieOptions.domain = '.grojetdelivery.com';
-        }
-
-        res
-            .cookie('admin_token', token, cookieOptions)
-            .status(200)
-            .json({
-                success: true,
-                message: 'Logged in successfully',
-                admin: {
-                    id: admin._id,
-                    name: admin.name,
-                    email: admin.email,
-                    role: admin.role
-                }
-            });
-    } catch (err) {
-        console.error('Admin fallback login error:', err);
         res.status(500).json({ success: false, message: 'Server error' });
     }
 });

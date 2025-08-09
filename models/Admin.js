@@ -10,10 +10,6 @@ const AdminSchema = new mongoose.Schema({
         enum: ['super_admin', 'admin', 'delivery_manager', 'inventory_manager'], 
         default: 'admin' 
     },
-    permissions: [{
-        module: { type: String, required: true }, // 'users', 'orders', 'products', 'delivery', 'merchants', 'analytics'
-        actions: [{ type: String }] // 'create', 'read', 'update', 'delete'
-    }],
     isActive: { type: Boolean, default: true },
     twofactorAuth: { type: Boolean, default: false },
     department: { type: String }, // e.g., 'Operations', 'Finance', 'HR'
@@ -34,13 +30,6 @@ AdminSchema.pre('save', async function (next) {
 
 AdminSchema.methods.matchPassword = async function (enteredPassword) {
     return await bcrypt.compare(enteredPassword, this.password);
-};
-
-AdminSchema.methods.hasPermission = function (module, action) {
-    if (this.role === 'super_admin') return true;
-    
-    const modulePermission = this.permissions.find(p => p.module === module);
-    return modulePermission && modulePermission.actions.includes(action);
 };
 
 const Admin = mongoose.model('Admin', AdminSchema);
