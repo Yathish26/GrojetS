@@ -10,8 +10,8 @@ router.get('/', protect, async (req, res) => {
         const page = Math.max(1, parseInt(req.query.page)) || 1;
         const skip = (page - 1) * limit;
 
-        const users = await User.find({}, { name: 1, email: 1, status: 1, createdAt: 1 })
-            .sort({ name: 1 })
+        const users = await User.find({}, { personalInfo: 1, status: 1, createdAt: 1 })
+            .populate('personalInfo')
             .skip(skip)
             .limit(limit);
 
