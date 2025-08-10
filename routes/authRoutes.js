@@ -250,6 +250,343 @@ router.post('/verify-otp', async (req, res) => {
     }
 });
 
+// =======================
+// Wishlist Endpoints (User Mobile Auth Required)
+// =======================
+router.get('/wishlist', protectNative, async (req, res) => {
+    try {
+        const user = await User.findById(req.user.userId).populate('wishlist', 'name thumbnail pricing.sellingPrice isActive');
+        if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+        res.status(200).json({ success: true, wishlist: user.wishlist || [] });
+    } catch (err) {
+        console.error('Get wishlist error:', err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+// Add item to wishlist (idempotent)
+router.post('/wishlist/:productId', protectNative, async (req, res) => {
+    try {
+        const { productId } = req.params;
+        const user = await User.findById(req.user.userId);
+        if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+        await user.addToWishlist(productId);
+        res.status(200).json({ success: true, message: 'Item added to wishlist', wishlist: user.wishlist });
+    } catch (err) {
+        console.error('Add wishlist error:', err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+// Remove item from wishlist
+router.delete('/wishlist/:productId', protectNative, async (req, res) => {
+    try {
+        const { productId } = req.params;
+        const user = await User.findById(req.user.userId);
+        if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+        await user.removeFromWishlist(productId);
+        res.status(200).json({ success: true, message: 'Item removed from wishlist', wishlist: user.wishlist });
+    } catch (err) {
+        console.error('Remove wishlist error:', err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+// Toggle wishlist item
+router.post('/wishlist/:productId/toggle', protectNative, async (req, res) => {
+    try {
+        const { productId } = req.params;
+        const user = await User.findById(req.user.userId);
+        if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+        const result = await user.toggleWishlistItem(productId);
+        res.status(200).json({ success: true, message: `Item ${result.action}`, wishlist: result.wishlist });
+    } catch (err) {
+        console.error('Toggle wishlist error:', err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+// =======================
+// Payment Methods & Points Endpoints
+// =======================
+
+// Helper to detect card brand from first digits (basic)
+const detectBrand = (num) => {
+    if (!num) return 'unknown';
+    if (/^4[0-9]{12}(?:[0-9]{3})?$/.test(num)) return 'visa';
+    if (/^5[1-5][0-9]{14}$/.test(num)) return 'mastercard';
+    return 'unknown';
+};
+
+// Get payment methods + points
+router.get('/payments', protectNative, async (req, res) => {
+    try {
+        const user = await User.findById(req.user.userId).select('paymentMethods loyalty.points');
+        if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+        res.json({
+            success: true,
+            cards: user.paymentMethods?.cards || [],
+            upi: user.paymentMethods?.upi?.id || null,
+            points: user.loyalty.points
+        });
+    } catch (err) {
+        console.error('Get payments error:', err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+// Add card (store only last4 + metadata; full number & cvv not persisted)
+router.post('/payments/cards', protectNative, async (req, res) => {
+    try {
+        const { cardNumber, expiry, name } = req.body;
+        if (!cardNumber || !expiry || !name) return res.status(400).json({ success: false, message: 'Missing fields' });
+        const sanitized = cardNumber.replace(/\s+/g, '');
+        if (!/^\d{16}$/.test(sanitized)) return res.status(400).json({ success: false, message: 'Invalid card number' });
+        if (!/^\d{2}\/\d{2}$/.test(expiry)) return res.status(400).json({ success: false, message: 'Invalid expiry format (MM/YY)' });
+        const [mm, yy] = expiry.split('/').map(v => parseInt(v, 10));
+        if (mm < 1 || mm > 12) return res.status(400).json({ success: false, message: 'Invalid expiry month' });
+        const currentYear = parseInt(new Date().getFullYear().toString().slice(-2));
+        // naive expiry check
+        if (yy < currentYear || yy > currentYear + 20) return res.status(400).json({ success: false, message: 'Invalid expiry year' });
+
+        const user = await User.findById(req.user.userId);
+        if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+        if (!user.paymentMethods) user.paymentMethods = { cards: [], upi: {} };
+        const brand = detectBrand(sanitized);
+        const card = {
+            brand,
+            last4: sanitized.slice(-4),
+            expiryMonth: mm,
+            expiryYear: 2000 + yy,
+            nameOnCard: name,
+            isDefault: user.paymentMethods.cards.length === 0
+        };
+        user.paymentMethods.cards.push(card);
+        await user.save();
+        res.status(201).json({ success: true, message: 'Card added', cards: user.paymentMethods.cards });
+    } catch (err) {
+        console.error('Add card error:', err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+// Set default card
+router.patch('/payments/cards/:index/default', protectNative, async (req, res) => {
+    try {
+        const { index } = req.params;
+        const idx = parseInt(index, 10);
+        const user = await User.findById(req.user.userId);
+        if (!user || !user.paymentMethods?.cards || idx < 0 || idx >= user.paymentMethods.cards.length) {
+            return res.status(404).json({ success: false, message: 'Card not found' });
+        }
+        user.paymentMethods.cards = user.paymentMethods.cards.map((c, i) => ({ ...c.toObject?.() || c, isDefault: i === idx }));
+        await user.save();
+        res.json({ success: true, message: 'Default card set', cards: user.paymentMethods.cards });
+    } catch (err) {
+        console.error('Set default card error:', err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+// Delete card
+router.delete('/payments/cards/:index', protectNative, async (req, res) => {
+    try {
+        const { index } = req.params;
+        const idx = parseInt(index, 10);
+        const user = await User.findById(req.user.userId);
+        if (!user || !user.paymentMethods?.cards || idx < 0 || idx >= user.paymentMethods.cards.length) {
+            return res.status(404).json({ success: false, message: 'Card not found' });
+        }
+        const removed = user.paymentMethods.cards.splice(idx, 1);
+        if (removed[0]?.isDefault && user.paymentMethods.cards.length > 0) {
+            user.paymentMethods.cards[0].isDefault = true;
+        }
+        await user.save();
+        res.json({ success: true, message: 'Card deleted', cards: user.paymentMethods.cards });
+    } catch (err) {
+        console.error('Delete card error:', err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+// Set or update single UPI ID
+router.post('/payments/upi', protectNative, async (req, res) => {
+    try {
+        const { upiId } = req.body;
+        if (!upiId || !/^[a-zA-Z0-9.\-_]{2,}@[a-zA-Z]{2,}$/.test(upiId)) {
+            return res.status(400).json({ success: false, message: 'Invalid UPI ID' });
+        }
+        const user = await User.findById(req.user.userId);
+        if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+        if (!user.paymentMethods) user.paymentMethods = { cards: [], upi: {} };
+        user.paymentMethods.upi = { id: upiId.toLowerCase(), addedAt: new Date() };
+        await user.save();
+        res.json({ success: true, message: 'UPI ID saved', upi: user.paymentMethods.upi.id });
+    } catch (err) {
+        console.error('Set UPI error:', err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+// Spend points
+router.post('/payments/points/spend', protectNative, async (req, res) => {
+    try {
+        const { points } = req.body;
+        const pts = parseInt(points, 10);
+        if (isNaN(pts) || pts <= 0) return res.status(400).json({ success: false, message: 'Invalid points value' });
+        const user = await User.findById(req.user.userId);
+        if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+        await user.spendLoyaltyPoints(pts);
+        res.json({ success: true, message: 'Points spent', points: user.loyalty.points });
+    } catch (err) {
+        console.error('Spend points error:', err);
+        res.status(400).json({ success: false, message: err.message || 'Error spending points' });
+    }
+});
+
+// =======================
+// Address Management Endpoints
+// =======================
+
+// Get addresses
+router.get('/addresses', protectNative, async (req, res) => {
+    try {
+        const user = await User.findById(req.user.userId).select('addresses');
+        if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+        res.json({ success: true, addresses: user.addresses || [] });
+    } catch (err) {
+        console.error('Get addresses error:', err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+// Add address
+router.post('/addresses', protectNative, async (req, res) => {
+    try {
+        const { type, street, landmark, city, state, zipCode, latitude, longitude, makeDefault, alternateNumber } = req.body;
+        if (!street || !city || !state || !zipCode) {
+            return res.status(400).json({ success: false, message: 'Missing required address fields' });
+        }
+        const user = await User.findById(req.user.userId);
+        if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+        const address = {
+            type: type || 'home',
+            street, landmark, city, state, zipCode,
+            alternateNumber,
+            coordinates: { latitude, longitude },
+            isDefault: false
+        };
+        user.addresses.push(address);
+        if (makeDefault || user.addresses.length === 1) {
+            user.addresses = user.addresses.map((a, idx) => ({ ...a.toObject?.() || a, isDefault: idx === user.addresses.length - 1 }));
+        }
+        await user.save();
+        res.status(201).json({ success: true, message: 'Address added', addresses: user.addresses });
+    } catch (err) {
+        console.error('Add address error:', err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+// Update address
+router.put('/addresses/:index', protectNative, async (req, res) => {
+    try {
+        const { index } = req.params;
+        const idx = parseInt(index, 10);
+        const user = await User.findById(req.user.userId);
+        if (!user || idx < 0 || idx >= user.addresses.length) return res.status(404).json({ success: false, message: 'Address not found' });
+    const { type, street, landmark, city, state, zipCode, latitude, longitude, makeDefault, alternateNumber } = req.body;
+        const target = user.addresses[idx];
+        if (type) target.type = type;
+        if (street) target.street = street;
+        if (landmark !== undefined) target.landmark = landmark;
+        if (city) target.city = city;
+        if (state) target.state = state;
+        if (zipCode) target.zipCode = zipCode;
+    if (alternateNumber !== undefined) target.alternateNumber = alternateNumber;
+        if (latitude !== undefined || longitude !== undefined) {
+            target.coordinates = { latitude, longitude };
+        }
+        if (makeDefault) {
+            user.addresses = user.addresses.map((a, i) => ({ ...a.toObject?.() || a, isDefault: i === idx }));
+        }
+        await user.save();
+        res.json({ success: true, message: 'Address updated', addresses: user.addresses });
+    } catch (err) {
+        console.error('Update address error:', err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+// Delete address
+router.delete('/addresses/:index', protectNative, async (req, res) => {
+    try {
+        const { index } = req.params;
+        const idx = parseInt(index, 10);
+        const user = await User.findById(req.user.userId);
+        if (!user || idx < 0 || idx >= user.addresses.length) return res.status(404).json({ success: false, message: 'Address not found' });
+        const wasDefault = user.addresses[idx].isDefault;
+        user.addresses.splice(idx, 1);
+        if (wasDefault && user.addresses.length > 0) {
+            user.addresses[0].isDefault = true;
+        }
+        await user.save();
+        res.json({ success: true, message: 'Address deleted', addresses: user.addresses });
+    } catch (err) {
+        console.error('Delete address error:', err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+// Set default address
+router.patch('/addresses/:index/default', protectNative, async (req, res) => {
+    try {
+        const idx = parseInt(req.params.index, 10);
+        const user = await User.findById(req.user.userId);
+        if (!user || idx < 0 || idx >= user.addresses.length) return res.status(404).json({ success: false, message: 'Address not found' });
+        user.addresses = user.addresses.map((a, i) => ({ ...a.toObject?.() || a, isDefault: i === idx }));
+        await user.save();
+        res.json({ success: true, message: 'Default address set', addresses: user.addresses });
+    } catch (err) {
+        console.error('Set default address error:', err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+// =======================
+// Notification Preferences Endpoints
+// =======================
+
+// Get notification preferences (+ whether email exists to conditionally show email toggle)
+router.get('/notification-preferences', protectNative, async (req, res) => {
+    try {
+        const user = await User.findById(req.user.userId).select('notificationPreferences personalInfo.email');
+        if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+        const prefs = user.notificationPreferences || {};
+        res.json({ success: true, preferences: prefs, hasEmail: !!user.personalInfo.email });
+    } catch (err) {
+        console.error('Get notification prefs error:', err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+// Update notification preferences
+router.put('/notification-preferences', protectNative, async (req, res) => {
+    try {
+        const updates = req.body || {};
+        const user = await User.findById(req.user.userId);
+        if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+        user.notificationPreferences = { ...user.notificationPreferences.toObject?.() || user.notificationPreferences, ...updates };
+        // If user lacks email, force emailNotifications false
+        if (!user.personalInfo.email) user.notificationPreferences.emailNotifications = false;
+        await user.save();
+        res.json({ success: true, preferences: user.notificationPreferences, hasEmail: !!user.personalInfo.email });
+    } catch (err) {
+        console.error('Update notification prefs error:', err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
 // Route: Resend OTP
 router.post('/resend-otp', async (req, res) => {
     try {
