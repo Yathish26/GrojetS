@@ -4,7 +4,7 @@ import bcrypt from 'bcryptjs';
 const UserSchema = new mongoose.Schema({
     personalInfo: {
         name: { type: String, trim: true },
-        email: { type: String, trim: true, lowercase: true, unique: true, sparse: true },
+        email: { type: String, trim: true, lowercase: true, sparse: true },
         phone: { type: String, required: true, unique: true },
         dateOfBirth: { type: Date },
         gender: { type: String, enum: ['male', 'female', 'other'] },
