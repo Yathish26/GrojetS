@@ -2,14 +2,15 @@ import express from 'express';
 import jwt from 'jsonwebtoken';
 import nodemailer from 'nodemailer';
 import Admin from '../../models/Admin.js';
+import Settings from '../../models/Settings.js';
+import bcrypt from 'bcryptjs';
 import { protectWithRole, checkPermission } from '../../middleware/authMiddleware.js';
 
 const router = express.Router();
 
 const isProduction = process.env.NODE_ENV === 'production';
 
-// Hardcoded PIN for admin registration authorization
-const ADMIN_REGISTRATION_PIN = process.env.ADMIN_REGISTRATION_PIN
+// PIN now stored in DB
 const AUTHORIZED_EMAIL = process.env.AUTHORIZED_EMAIL
 
 // Store OTPs temporarily (in production, use Redis or database)
@@ -27,28 +28,27 @@ const createTransporter = () => {
 };
 
 // Step 1: Verify PIN for admin registration
+// Verify PIN for admin registration (from DB)
 router.post('/verify-pin', async (req, res) => {
     try {
         const { pin } = req.body;
-        
         if (!pin) {
             return res.status(400).json({ success: false, message: 'PIN is required' });
         }
-        
-        if (pin !== ADMIN_REGISTRATION_PIN) {
+        const settings = await Settings.findOne();
+        if (!settings || !settings.adminRegistrationPin) {
+            return res.status(500).json({ success: false, message: 'PIN not set. Contact super admin.' });
+        }
+        const isMatch = await bcrypt.compare(pin, settings.adminRegistrationPin);
+        if (!isMatch) {
             return res.status(400).json({ success: false, message: 'Invalid PIN' });
         }
-        
         // Generate and send OTP
         const otp = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit OTP
         const otpExpiry = Date.now() + 10 * 60 * 1000; // 10 minutes expiry
-        
-        // Store OTP with expiry
         otpStore.set(AUTHORIZED_EMAIL, { otp, expiry: otpExpiry });
-        
         try {
             const transporter = createTransporter();
-            
             const mailOptions = {
                 from: process.env.GMAIL_USER || 'noreply@grojet.com',
                 to: AUTHORIZED_EMAIL,
@@ -68,9 +68,7 @@ router.post('/verify-pin', async (req, res) => {
                     </div>
                 `
             };
-            
             await transporter.sendMail(mailOptions);
-            
             res.status(200).json({ 
                 success: true, 
                 message: 'PIN verified successfully. OTP sent to authorized email.' 
@@ -82,9 +80,30 @@ router.post('/verify-pin', async (req, res) => {
                 message: 'PIN verified but failed to send OTP. Please try again.' 
             });
         }
-        
     } catch (error) {
         console.error('PIN verification error:', error);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+// Super admin: change admin registration PIN
+router.put('/settings/pin', protectWithRole(['super_admin']), async (req, res) => {
+    try {
+        const { newPin } = req.body;
+        if (!newPin || newPin.length < 4) {
+            return res.status(400).json({ success: false, message: 'PIN must be at least 4 digits.' });
+        }
+        const hashedPin = await bcrypt.hash(newPin, 10);
+        let settings = await Settings.findOne();
+        if (!settings) {
+            settings = new Settings({ adminRegistrationPin: hashedPin, updatedBy: req.user.adminId });
+        } else {
+            settings.adminRegistrationPin = hashedPin;
+            settings.updatedBy = req.user.adminId;
+            settings.updatedAt = new Date();
+        }
+        await settings.save();
+        res.json({ success: true, message: 'Admin registration PIN updated successfully.' });
+    } catch (error) {
         res.status(500).json({ success: false, message: 'Server error' });
     }
 });
