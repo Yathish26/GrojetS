@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 
 const SettingsSchema = new mongoose.Schema({
-  adminRegistrationPin: { type: String, required: true }, // hashed
+  adminRegistrationPin: { type: String, required: true },
   updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin' },
   updatedAt: { type: Date, default: Date.now }
 });
